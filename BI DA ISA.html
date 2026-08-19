@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de KPIs | Analytics Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #002d5c;
+            --accent: #00d4ff;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="light"] {
+            --bg: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.8);
+            --text: #1e293b;
+            --primary: #005088;
+            --border: rgba(0, 0, 0, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-x: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            background: linear-gradient(180deg, var(--primary) 0%, #001529 100%);
+            position: fixed;
+            padding: 30px 20px;
+            display: flex; flex-direction: column;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .logo { font-weight: 800; font-size: 20px; color: #fff; margin-bottom: 40px; display: flex; align-items: center; gap: 10px; }
+        .logo i { color: var(--accent); }
+        .logo-sub { font-size: 11px; font-weight: 400; opacity: 0.5; display: block; margin-top: 2px; letter-spacing: 1px; }
+
+        .nav-link {
+            padding: 14px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 12px;
+            transition: 0.3s;
+            color: rgba(255,255,255,0.7);
+            font-weight: 500;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.05);
+        }
+
+        .nav-link.active { border-right: 4px solid var(--accent); }
+
+        .main { margin-left: 260px; padding: 40px; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; margin-bottom: 40px; }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 25px;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-5px); }
+
+        .kpi-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; font-weight: 600; }
+        .kpi-value { font-size: 32px; font-weight: 700; margin: 10px 0; color: var(--accent); }
+        .kpi-delta { font-size: 13px; opacity: 0.7; }
+        .kpi-delta.up { color: #10b981; }
+        .kpi-delta.down { color: #ef4444; }
+
+        .table-container { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+        th { padding: 15px; text-align: left; opacity: 0.6; font-weight: 600; font-size: 13px; }
+        td {
+            padding: 18px 15px;
+            background: rgba(255,255,255,0.02);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        td:first-child { border-left: 1px solid var(--border); border-radius: 12px 0 0 12px; }
+        td:last-child { border-right: 1px solid var(--border); border-radius: 0 12px 12px 0; }
+
+        .upload-area {
+            background: linear-gradient(90deg, var(--accent) 0%, #0082ff 100%);
+            color: #fff; padding: 12px 25px; border-radius: 12px;
+            cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 10px;
+            border: none; margin-bottom: 20px; font-size: 13px;
+        }
+
+        .content-tab { display: none; animation: fadeIn 0.5s ease; }
+        .content-tab.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .swot-item { padding: 25px; border-radius: 20px; min-height: 170px; }
+        .s-f { background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16,185,129,0.4); }
+        .s-w { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239,68,68,0.4); }
+        .s-o { background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59,130,246,0.4); }
+        .s-t { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245,158,11,0.4); }
+        .swot-item h3 { margin-bottom: 12px; font-size: 15px; }
+        .swot-item ul { padding-left: 18px; }
+        .swot-item li { margin-bottom: 8px; font-size: 14px; opacity: 0.85; line-height: 1.5; }
+
+        .filters { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
+        select {
+            background: var(--card-bg); border: 1px solid var(--border);
+            color: var(--text); padding: 10px 20px; border-radius: 10px; outline: none;
+            cursor: pointer;
+        }
+
+        .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px; }
+        .chart-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 24px; padding: 25px; }
+        .chart-card h3 { margin-bottom: 20px; font-size: 16px; }
+
+        .big-number { font-size: 52px; font-weight: 800; color: var(--accent); margin: 25px 0 10px; }
+
+        .status-badge {
+            padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+        }
+        .badge-ok { background: rgba(16,185,129,0.15); color: #10b981; }
+        .badge-warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .badge-risk { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .badge-new { background: rgba(59,130,246,0.15); color: #3b82f6; }
+
+        .progress-bar { background: rgba(255,255,255,0.08); border-radius: 999px; height: 8px; width: 100%; margin-top: 6px; }
+        .progress-fill { height: 8px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), #0082ff); }
+
+        .region-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 18px 22px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .region-name { font-weight: 600; font-size: 15px; }
+        .region-meta { font-size: 13px; opacity: 0.6; margin-top: 3px; }
+
+        .section-title { font-size: 20px; font-weight: 700; margin-bottom: 25px; }
+        .section-subtitle { font-size: 14px; opacity: 0.55; font-weight: 400; margin-left: 10px; }
+
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+
+        .info-note {
+            background: rgba(0,212,255,0.07);
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 12px;
+            padding: 14px 20px;
+            font-size: 13px;
+            margin-bottom: 25px;
+            opacity: 0.9;
+        }
+        .info-note i { color: var(--accent); margin-right: 8px; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div class="sidebar">
+        <div class="logo">
+            <i class="fa-solid fa-chart-column"></i>
+            <div>
+                Sistema de KPIs
+                <span class="logo-sub">TRADE MARKETING</span>
+            </div>
+        </div>
+
+        <label class="upload-area">
+            <i class="fa-solid fa-cloud-arrow-up"></i> CARREGAR BASE
+            <input type="file" id="excelFile" style="display: none;" accept=".xlsx">
+        </label>
+
+        <nav>
+            <div class="nav-link active" onclick="switchTab('geral', this)"><i class="fa-solid fa-house"></i> Visão Geral</div>
+            <div class="nav-link" onclick="switchTab('trimestre', this)"><i class="fa-solid fa-chart-line"></i> Comparativo 25×26</div>
+            <div class="nav-link" onclick="switchTab('status', this)"><i class="fa-solid fa-users-gear"></i> Gestão de Status</div>
+            <div class="nav-link" onclick="switchTab('swot', this)"><i class="fa-solid fa-brain"></i> Matriz SWOT</div>
+            <div class="nav-link" onclick="switchTab('ibge', this)"><i class="fa-solid fa-map-pin"></i> IBGE &amp; Regiões</div>
+        </nav>
+
+        <div style="margin-top: auto;">
+            <div class="nav-link" onclick="toggleTheme()"><i class="fa-solid fa-circle-half-stroke"></i> Trocar Tema</div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Sistema de KPIs <span style="font-weight: 300; opacity: 0.4;">| Trade Marketing</span></h1>
+                <p style="opacity:0.45; font-size:13px; margin-top:4px;">Monitoramento de indicadores de desempenho operacional</p>
+            </div>
+            <div class="filters">
+                <select id="coordFilter" onchange="filterData()">
+                    <option value="all">Todos os Coordenadores</option>
+                </select>
+                <select id="periodoFilter" onchange="filterData()">
+                    <option value="all">Todos os Períodos</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ===== ABA: VISÃO GERAL ===== -->
+        <div id="geral" class="content-tab active">
+            <div class="kpi-grid">
+                <div class="card">
+                    <div class="kpi-title">Carteira Ativa</div>
+                    <div class="kpi-value" id="kpi-ativa">—</div>
+                    <div class="kpi-delta up" id="kpi-ativa-delta"><i class="fa-solid fa-caret-up"></i> Clientes elegíveis</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Positivação Real</div>
+                    <div class="kpi-value" id="kpi-real">—</div>
+                    <div class="kpi-delta up" id="kpi-real-delta"><i class="fa-solid fa-caret-up"></i> Clientes atendidos</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">% Atendimento</div>
+                    <div class="kpi-value" id="kpi-perc">—</div>
+                    <div class="kpi-delta" id="kpi-perc-delta">Taxa de cobertura da carteira</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Coordenadores Ativos</div>
+                    <div class="kpi-value" id="kpi-coords">—</div>
+                    <div class="kpi-delta up"><i class="fa-solid fa-caret-up"></i> Equipe operacional</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="section-title" style="margin-bottom:5px;">Desempenho por Coordenador <span class="section-subtitle">Resumo do período selecionado</span></h3>
+                <div class="table-container">
+                    <table id="mainTable">
+                        <thead>
+                            <tr>
+                                <th>COORDENADOR</th>
+                                <th>CART. TOTAL</th>
+                                <th>CART. ATIVA</th>
+                                <th>POSITIVADO</th>
+                                <th>% ATEND.</th>
+                                <th>STATUS</th>
+                                <th>EVOLUÇÃO</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ABA: COMPARATIVO TRIMESTRAL ===== -->
+        <div id="trimestre" class="content-tab">
+            <div class="info-note"><i class="fa-solid fa-circle-info"></i>Comparativo entre Q4/2025 (Out–Dez) e Q1/2026 (Jan–Mar) — baseado nos dados da base de positivação.</div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h3>Volume de Positivação por Trimestre</h3>
+                    <canvas id="triChart" height="220"></canvas>
+                </div>
+                <div class="chart-card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+                    <div style="opacity:0.6;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Crescimento Q4/25 → Q1/26</div>
+                    <div class="big-number" id="triValue">—</div>
+                    <p style="opacity:0.5;font-size:14px;max-width:260px;">Variação na positivação acumulada entre os dois períodos analisados.</p>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h3>Positivação Mensal — Série Histórica</h3>
+                    <canvas id="monthlyChart" height="220"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Distribuição por Coordenador</h3>
+                    <canvas id="coordPieChart" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ABA: GESTÃO DE STATUS ===== -->
+        <div id="status" class="content-tab">
+            <div class="info-note"><i class="fa-solid fa-circle-info"></i>Classificação dos clientes da carteira por status operacional. Atualização mensal conforme ciclo de visitas.</div>
+            <div class="grid-3">
+                <div class="card">
+                    <div class="kpi-title">Clientes Regulares</div>
+                    <div class="kpi-value" id="st-ok">—</div>
+                    <div class="kpi-delta up">Atendimento em dia</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Em Acompanhamento</div>
+                    <div class="kpi-value" id="st-warn">—</div>
+                    <div class="kpi-delta" style="color:#f59e0b;">Requer atenção</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Em Risco / Inativos</div>
+                    <div class="kpi-value" id="st-risk">—</div>
+                    <div class="kpi-delta down">Intervenção necessária</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="section-title" style="margin-bottom:5px;">Mapa de Status por Coordenador <span class="section-subtitle">Período atual</span></h3>
+                <div class="table-container">
+                    <table id="statusTable">
+                        <thead>
+                            <tr>
+                                <th>COORDENADOR</th>
+                                <th>REGULAR</th>
+                                <th>ACOMPANHAMENTO</th>
+                                <th>EM RISCO</th>
+                                <th>NOVOS</th>
+                                <th>COBERTURA</th>
+                                <th>TENDÊNCIA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statusTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="charts-row" style="margin-top:25px;">
+                <div class="chart-card">
+                    <h3>Distribuição de Status — Carteira Total</h3>
+                    <canvas id="statusDonut" height="220"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Evolução Mensal de Status</h3>
+                    <canvas id="statusLine" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ABA: SWOT ===== -->
+        <div id="swot" class="content-tab">
+            <div class="info-note"><i class="fa-solid fa-circle-info"></i>Análise estratégica da operação de Trade Marketing — atualização semestral pela liderança.</div>
+            <div class="swot-grid" style="margin-bottom:20px;">
+                <div class="swot-item s-f">
+                    <h3><i class="fa-solid fa-plus-circle" style="color:#10b981;margin-right:8px;"></i>Forças (Strengths)</h3>
+                    <ul id="list-f"></ul>
+                </div>
+                <div class="swot-item s-w">
+                    <h3><i class="fa-solid fa-minus-circle" style="color:#ef4444;margin-right:8px;"></i>Fraquezas (Weaknesses)</h3>
+                    <ul id="list-w"></ul>
+                </div>
+                <div class="swot-item s-o">
+                    <h3><i class="fa-solid fa-arrow-up-right-dots" style="color:#3b82f6;margin-right:8px;"></i>Oportunidades (Opportunities)</h3>
+                    <ul id="list-o"></ul>
+                </div>
+                <div class="swot-item s-t">
+                    <h3><i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-right:8px;"></i>Ameaças (Threats)</h3>
+                    <ul id="list-t"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ABA: IBGE & REGIÕES ===== -->
+        <div id="ibge" class="content-tab">
+            <div class="info-note"><i class="fa-solid fa-circle-info"></i>Distribuição geográfica da carteira de clientes conforme classificação IBGE de mesorregiões.</div>
+            <div class="kpi-grid" style="margin-bottom:30px;">
+                <div class="card">
+                    <div class="kpi-title">Regiões Cobertas</div>
+                    <div class="kpi-value" id="reg-total">—</div>
+                    <div class="kpi-delta up">Mesorregiões ativas</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Maior Concentração</div>
+                    <div class="kpi-value" style="font-size:20px;" id="reg-top">—</div>
+                    <div class="kpi-delta">Região com mais clientes</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Maior % Atendimento</div>
+                    <div class="kpi-value" style="font-size:20px;" id="reg-best">—</div>
+                    <div class="kpi-delta up">Melhor desempenho regional</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-title">Cobertura Média</div>
+                    <div class="kpi-value" id="reg-avg">—</div>
+                    <div class="kpi-delta">Taxa média por região</div>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card" style="grid-column: 1 / -1;">
+                    <h3>Positivação por Mesorregião IBGE</h3>
+                    <canvas id="ibgeChart" height="130"></canvas>
+                </div>
+            </div>
+            <div id="ibgeList" style="margin-top:10px;"></div>
+        </div>
+
+    </div><!-- /main -->
+
+    <script>
+    // ================================================================
+    // BASE DE DADOS FICTÍCIA — SISTEMA DE KPIs
+    // Estrutura:
+    //   DB.positivacao  → tabela principal (5 coordenadores × 12 meses)
+    //   DB.swot         → análise SWOT (forças, fraquezas, oport., ameaças)
+    //   DB.status       → breakdown de status por coordenador/mês
+    //   DB.ibge         → distribuição regional por mesorregião
+    // ================================================================
+    const DB = {
+
+      positivacao: [
+        // COORDENADOR | PERIODO | CARTEIRA TOTAL | CARTEIRA ATIVA | POSITIVADO | REGIAO
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-01", CART_TOTAL:210, CART_ATIVA:185, POSITIVADO:142, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-02", CART_TOTAL:210, CART_ATIVA:188, POSITIVADO:149, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-03", CART_TOTAL:215, CART_ATIVA:190, POSITIVADO:153, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-04", CART_TOTAL:215, CART_ATIVA:192, POSITIVADO:158, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-05", CART_TOTAL:218, CART_ATIVA:195, POSITIVADO:162, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-06", CART_TOTAL:220, CART_ATIVA:197, POSITIVADO:165, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-07", CART_TOTAL:220, CART_ATIVA:196, POSITIVADO:160, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-08", CART_TOTAL:222, CART_ATIVA:198, POSITIVADO:164, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-09", CART_TOTAL:222, CART_ATIVA:199, POSITIVADO:168, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-10", CART_TOTAL:225, CART_ATIVA:200, POSITIVADO:170, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-11", CART_TOTAL:225, CART_ATIVA:201, POSITIVADO:173, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2025-12", CART_TOTAL:228, CART_ATIVA:203, POSITIVADO:178, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2026-01", CART_TOTAL:228, CART_ATIVA:204, POSITIVADO:181, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2026-02", CART_TOTAL:230, CART_ATIVA:205, POSITIVADO:185, REGIAO:"Sudeste"},
+        {COORDENADOR:"Ana Beatriz Lemos",  PERIODO:"2026-03", CART_TOTAL:230, CART_ATIVA:207, POSITIVADO:188, REGIAO:"Sudeste"},
+
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-01", CART_TOTAL:175, CART_ATIVA:150, POSITIVADO:108, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-02", CART_TOTAL:175, CART_ATIVA:152, POSITIVADO:112, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-03", CART_TOTAL:178, CART_ATIVA:154, POSITIVADO:116, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-04", CART_TOTAL:178, CART_ATIVA:155, POSITIVADO:118, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-05", CART_TOTAL:180, CART_ATIVA:157, POSITIVADO:121, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-06", CART_TOTAL:180, CART_ATIVA:158, POSITIVADO:124, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-07", CART_TOTAL:182, CART_ATIVA:158, POSITIVADO:119, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-08", CART_TOTAL:182, CART_ATIVA:159, POSITIVADO:122, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-09", CART_TOTAL:184, CART_ATIVA:161, POSITIVADO:127, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-10", CART_TOTAL:184, CART_ATIVA:162, POSITIVADO:129, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-11", CART_TOTAL:186, CART_ATIVA:163, POSITIVADO:132, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2025-12", CART_TOTAL:186, CART_ATIVA:164, POSITIVADO:136, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2026-01", CART_TOTAL:188, CART_ATIVA:165, POSITIVADO:139, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2026-02", CART_TOTAL:188, CART_ATIVA:166, POSITIVADO:142, REGIAO:"Sul"},
+        {COORDENADOR:"Carlos Eduardo Mota", PERIODO:"2026-03", CART_TOTAL:190, CART_ATIVA:168, POSITIVADO:146, REGIAO:"Sul"},
+
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-01", CART_TOTAL:240, CART_ATIVA:210, POSITIVADO:158, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-02", CART_TOTAL:240, CART_ATIVA:213, POSITIVADO:164, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-03", CART_TOTAL:245, CART_ATIVA:215, POSITIVADO:169, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-04", CART_TOTAL:245, CART_ATIVA:217, POSITIVADO:172, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-05", CART_TOTAL:248, CART_ATIVA:220, POSITIVADO:178, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-06", CART_TOTAL:250, CART_ATIVA:222, POSITIVADO:183, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-07", CART_TOTAL:250, CART_ATIVA:221, POSITIVADO:176, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-08", CART_TOTAL:252, CART_ATIVA:223, POSITIVADO:180, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-09", CART_TOTAL:252, CART_ATIVA:225, POSITIVADO:187, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-10", CART_TOTAL:255, CART_ATIVA:227, POSITIVADO:192, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-11", CART_TOTAL:255, CART_ATIVA:228, POSITIVADO:196, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2025-12", CART_TOTAL:258, CART_ATIVA:230, POSITIVADO:201, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2026-01", CART_TOTAL:258, CART_ATIVA:232, POSITIVADO:206, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2026-02", CART_TOTAL:260, CART_ATIVA:233, POSITIVADO:210, REGIAO:"Nordeste"},
+        {COORDENADOR:"Fernanda Quirino",    PERIODO:"2026-03", CART_TOTAL:262, CART_ATIVA:235, POSITIVADO:214, REGIAO:"Nordeste"},
+
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-01", CART_TOTAL:190, CART_ATIVA:162, POSITIVADO:115, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-02", CART_TOTAL:190, CART_ATIVA:164, POSITIVADO:119, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-03", CART_TOTAL:192, CART_ATIVA:165, POSITIVADO:122, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-04", CART_TOTAL:192, CART_ATIVA:166, POSITIVADO:125, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-05", CART_TOTAL:195, CART_ATIVA:168, POSITIVADO:128, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-06", CART_TOTAL:195, CART_ATIVA:170, POSITIVADO:132, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-07", CART_TOTAL:196, CART_ATIVA:169, POSITIVADO:127, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-08", CART_TOTAL:196, CART_ATIVA:170, POSITIVADO:130, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-09", CART_TOTAL:198, CART_ATIVA:172, POSITIVADO:135, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-10", CART_TOTAL:198, CART_ATIVA:173, POSITIVADO:138, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-11", CART_TOTAL:200, CART_ATIVA:174, POSITIVADO:141, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2025-12", CART_TOTAL:200, CART_ATIVA:175, POSITIVADO:145, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2026-01", CART_TOTAL:202, CART_ATIVA:177, POSITIVADO:149, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2026-02", CART_TOTAL:202, CART_ATIVA:178, POSITIVADO:152, REGIAO:"Centro-Oeste"},
+        {COORDENADOR:"Rafael Andrade",      PERIODO:"2026-03", CART_TOTAL:205, CART_ATIVA:180, POSITIVADO:157, REGIAO:"Centro-Oeste"},
+
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-01", CART_TOTAL:160, CART_ATIVA:138, POSITIVADO:95,  REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-02", CART_TOTAL:160, CART_ATIVA:139, POSITIVADO:98,  REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-03", CART_TOTAL:162, CART_ATIVA:140, POSITIVADO:101, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-04", CART_TOTAL:162, CART_ATIVA:141, POSITIVADO:103, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-05", CART_TOTAL:165, CART_ATIVA:143, POSITIVADO:107, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-06", CART_TOTAL:165, CART_ATIVA:144, POSITIVADO:110, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-07", CART_TOTAL:166, CART_ATIVA:143, POSITIVADO:105, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-08", CART_TOTAL:166, CART_ATIVA:144, POSITIVADO:108, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-09", CART_TOTAL:168, CART_ATIVA:146, POSITIVADO:113, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-10", CART_TOTAL:168, CART_ATIVA:147, POSITIVADO:116, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-11", CART_TOTAL:170, CART_ATIVA:148, POSITIVADO:119, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2025-12", CART_TOTAL:170, CART_ATIVA:149, POSITIVADO:122, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2026-01", CART_TOTAL:172, CART_ATIVA:151, POSITIVADO:126, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2026-02", CART_TOTAL:172, CART_ATIVA:152, POSITIVADO:129, REGIAO:"Norte"},
+        {COORDENADOR:"Tatiane Souza Costa", PERIODO:"2026-03", CART_TOTAL:175, CART_ATIVA:154, POSITIVADO:133, REGIAO:"Norte"},
+      ],
+
+      swot: {
+        forcas: [
+          "Equipe regional consolidada com mais de 3 anos de atuação média",
+          "Alta capilaridade nas praças do Sudeste e Nordeste",
+          "Processo padronizado de visitas com checklist digital",
+          "Taxa de retenção de clientes acima de 88% nos últimos 12 meses",
+          "Dashboard de KPIs em tempo real para tomada de decisão ágil",
+        ],
+        fraquezas: [
+          "Rotatividade elevada na região Norte (3 trocas em 12 meses)",
+          "Cobertura ainda limitada em municípios de porte médio",
+          "Dependência de planilhas manuais em parte do processo de registro",
+          "Tempo médio de resposta a chamados de clientes acima do SLA",
+        ],
+        oportunidades: [
+          "Expansão para o interior do Nordeste — mercado ainda subexplorado",
+          "Digitalização de roteiros com app móvel em desenvolvimento",
+          "Crescimento de 18% no canal farma nas regiões atuadas",
+          "Parceria com distribuidores regionais para ampliar carteira",
+          "Demanda crescente por produtos de alto valor agregado",
+        ],
+        ameacas: [
+          "Concorrentes regionais com forte presença em preço baixo",
+          "Instabilidade econômica impactando pequenos varejistas",
+          "Aumento de custo logístico nas rotas do Norte",
+          "Restrições regulatórias em novos municípios prioritários",
+        ],
+      },
+
+      status: [
+        // COORDENADOR | MES | REGULAR | ACOMPANHAMENTO | RISCO | NOVOS
+        {COORDENADOR:"Ana Beatriz Lemos",  MES:"Jan/26", REGULAR:158, ACOMP:28, RISCO:14, NOVOS:9},
+        {COORDENADOR:"Ana Beatriz Lemos",  MES:"Fev/26", REGULAR:163, ACOMP:25, RISCO:12, NOVOS:7},
+        {COORDENADOR:"Ana Beatriz Lemos",  MES:"Mar/26", REGULAR:168, ACOMP:22, RISCO:10, NOVOS:7},
+        {COORDENADOR:"Carlos Eduardo Mota",MES:"Jan/26", REGULAR:120, ACOMP:26, RISCO:16, NOVOS:5},
+        {COORDENADOR:"Carlos Eduardo Mota",MES:"Fev/26", REGULAR:124, ACOMP:24, RISCO:14, NOVOS:6},
+        {COORDENADOR:"Carlos Eduardo Mota",MES:"Mar/26", REGULAR:129, ACOMP:22, RISCO:12, NOVOS:5},
+        {COORDENADOR:"Fernanda Quirino",   MES:"Jan/26", REGULAR:182, ACOMP:32, RISCO:14, NOVOS:10},
+        {COORDENADOR:"Fernanda Quirino",   MES:"Fev/26", REGULAR:188, ACOMP:28, RISCO:12, NOVOS:9},
+        {COORDENADOR:"Fernanda Quirino",   MES:"Mar/26", REGULAR:193, ACOMP:25, RISCO:10, NOVOS:9},
+        {COORDENADOR:"Rafael Andrade",     MES:"Jan/26", REGULAR:130, ACOMP:28, RISCO:17, NOVOS:6},
+        {COORDENADOR:"Rafael Andrade",     MES:"Fev/26", REGULAR:134, ACOMP:26, RISCO:15, NOVOS:5},
+        {COORDENADOR:"Rafael Andrade",     MES:"Mar/26", REGULAR:139, ACOMP:24, RISCO:13, NOVOS:6},
+        {COORDENADOR:"Tatiane Souza Costa",MES:"Jan/26", REGULAR:108, ACOMP:24, RISCO:18, NOVOS:4},
+        {COORDENADOR:"Tatiane Souza Costa",MES:"Fev/26", REGULAR:112, ACOMP:22, RISCO:16, NOVOS:5},
+        {COORDENADOR:"Tatiane Souza Costa",MES:"Mar/26", REGULAR:116, ACOMP:20, RISCO:14, NOVOS:4},
+      ],
+
+      ibge: [
+        {MESORREGIAO:"Grande SP",           UF:"SP", REGIAO:"Sudeste",     CART_TOTAL:180, POSITIVADO:148, COORD:"Ana Beatriz Lemos"},
+        {MESORREGIAO:"Campinas e Interior",  UF:"SP", REGIAO:"Sudeste",     CART_TOTAL:92,  POSITIVADO:71,  COORD:"Ana Beatriz Lemos"},
+        {MESORREGIAO:"Grande Porto Alegre",  UF:"RS", REGIAO:"Sul",         CART_TOTAL:110, POSITIVADO:88,  COORD:"Carlos Eduardo Mota"},
+        {MESORREGIAO:"Serra Gaúcha",         UF:"RS", REGIAO:"Sul",         CART_TOTAL:78,  POSITIVADO:58,  COORD:"Carlos Eduardo Mota"},
+        {MESORREGIAO:"RMR — Grande Recife",  UF:"PE", REGIAO:"Nordeste",    CART_TOTAL:140, POSITIVADO:118, COORD:"Fernanda Quirino"},
+        {MESORREGIAO:"Sertão Nordestino",    UF:"CE", REGIAO:"Nordeste",    CART_TOTAL:96,  POSITIVADO:74,  COORD:"Fernanda Quirino"},
+        {MESORREGIAO:"Salvador e RMS",       UF:"BA", REGIAO:"Nordeste",    CART_TOTAL:122, POSITIVADO:96,  COORD:"Fernanda Quirino"},
+        {MESORREGIAO:"Grande Goiânia",       UF:"GO", REGIAO:"Centro-Oeste",CART_TOTAL:105, POSITIVADO:84,  COORD:"Rafael Andrade"},
+        {MESORREGIAO:"Triângulo Mineiro",    UF:"MG", REGIAO:"Centro-Oeste",CART_TOTAL:80,  POSITIVADO:61,  COORD:"Rafael Andrade"},
+        {MESORREGIAO:"Grande Manaus",        UF:"AM", REGIAO:"Norte",       CART_TOTAL:88,  POSITIVADO:68,  COORD:"Tatiane Souza Costa"},
+        {MESORREGIAO:"Belém e RMB",          UF:"PA", REGIAO:"Norte",       CART_TOTAL:72,  POSITIVADO:53,  COORD:"Tatiane Souza Costa"},
+      ],
+    };
+
+    // ================================================================
+    // ENGINE DO DASHBOARD
+    // ================================================================
+    let myCharts = {};
+
+    function toggleTheme() {
+        const body = document.body;
+        body.setAttribute('data-theme', body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        el.classList.add('active');
+    }
+
+    // Upload de Excel externo (sobrescreve DB.positivacao e DB.swot se carregar)
+    document.getElementById('excelFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const raw = {};
+            workbook.SheetNames.forEach(name => {
+                raw[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
+            });
+            if(raw['BASE POSITIVAÇÃO'] && raw['BASE POSITIVAÇÃO'].length > 0) {
+                const mapped = raw['BASE POSITIVAÇÃO'].map(r => ({
+                    COORDENADOR: r.COORDENADOR,
+                    PERIODO: r.PERIODO,
+                    CART_TOTAL: r['CARTEIRA TOTAL'] || 0,
+                    CART_ATIVA: r['CARTEIRA ATIVA '] || r['CARTEIRA ATIVA'] || 0,
+                    POSITIVADO: r.POSITIVADO || 0,
+                    REGIAO: r.REGIAO || '—',
+                }));
+                DB.positivacao = mapped;
+                alert('Base carregada com sucesso! (' + mapped.length + ' registros)');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        initDashboard();
+    });
+
+    function filterData() {
+        const coord = document.getElementById('coordFilter').value;
+        const periodo = document.getElementById('periodoFilter').value;
+        updateView(coord, periodo);
+    }
+
+    function initDashboard() {
+        const coords = [...new Set(DB.positivacao.map(r => r.COORDENADOR))];
+        const periodos = [...new Set(DB.positivacao.map(r => r.PERIODO))].sort();
+
+        const cs = document.getElementById('coordFilter');
+        cs.innerHTML = '<option value="all">Todos os Coordenadores</option>';
+        coords.forEach(c => cs.innerHTML += `<option value="${c}">${c}</option>`);
+
+        const ps = document.getElementById('periodoFilter');
+        ps.innerHTML = '<option value="all">Todos os Períodos</option>';
+        periodos.forEach(p => ps.innerHTML += `<option value="${p}">${fmtPeriodo(p)}</option>`);
+
+        updateView('all', 'all');
+        renderTrimestre();
+        renderStatus();
+        renderSWOT();
+        renderIBGE();
+    }
+
+    function fmtPeriodo(p) {
+        const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        if(!p || !p.includes('-')) return p;
+        const [y, m] = p.split('-');
+        return months[parseInt(m)-1] + '/' + y.slice(2);
+    }
+
+    function updateView(coord, periodo) {
+        let data = [...DB.positivacao];
+        if(coord !== 'all') data = data.filter(r => r.COORDENADOR === coord);
+        if(periodo !== 'all') data = data.filter(r => r.PERIODO === periodo);
+
+        const totalAtiva = data.reduce((a, b) => a + b.CART_ATIVA, 0);
+        const totalPos   = data.reduce((a, b) => a + b.POSITIVADO, 0);
+        const perc = totalAtiva > 0 ? (totalPos / totalAtiva * 100) : 0;
+        const coordsAtivos = [...new Set(data.map(r => r.COORDENADOR))].length;
+
+        document.getElementById('kpi-ativa').innerText = totalAtiva.toLocaleString('pt-BR');
+        document.getElementById('kpi-real').innerText  = totalPos.toLocaleString('pt-BR');
+        document.getElementById('kpi-perc').innerText  = perc.toFixed(1) + '%';
+        document.getElementById('kpi-coords').innerText = coordsAtivos;
+
+        const percEl = document.getElementById('kpi-perc-delta');
+        if(perc >= 80) { percEl.className='kpi-delta up'; percEl.innerHTML='<i class="fa-solid fa-caret-up"></i> Meta de 80% atingida'; }
+        else { percEl.className='kpi-delta down'; percEl.innerHTML='<i class="fa-solid fa-caret-down"></i> Abaixo da meta de 80%'; }
+
+        // Agrupar por coordenador (último período disponível de cada)
+        const resumo = {};
+        data.forEach(r => {
+            if(!resumo[r.COORDENADOR]) resumo[r.COORDENADOR] = {total:0, ativa:0, pos:0};
+            resumo[r.COORDENADOR].total += r.CART_TOTAL;
+            resumo[r.COORDENADOR].ativa += r.CART_ATIVA;
+            resumo[r.COORDENADOR].pos   += r.POSITIVADO;
+        });
+
+        const tbody = document.querySelector('#mainTable tbody');
+        tbody.innerHTML = '';
+        Object.keys(resumo).forEach(c => {
+            const row = resumo[c];
+            const p = row.ativa > 0 ? ((row.pos / row.ativa) * 100) : 0;
+            let badge, trend;
+            if(p >= 85)      { badge = '<span class="status-badge badge-ok">Excelente</span>'; trend='<i class="fa-solid fa-caret-up" style="color:#10b981"></i>'; }
+            else if(p >= 72) { badge = '<span class="status-badge badge-warn">Regular</span>'; trend='<i class="fa-solid fa-minus" style="color:#f59e0b"></i>'; }
+            else             { badge = '<span class="status-badge badge-risk">Atenção</span>'; trend='<i class="fa-solid fa-caret-down" style="color:#ef4444"></i>'; }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${c}</strong></td>
+                    <td>${row.total.toLocaleString('pt-BR')}</td>
+                    <td>${row.ativa.toLocaleString('pt-BR')}</td>
+                    <td>${row.pos.toLocaleString('pt-BR')}</td>
+                    <td style="color:var(--accent); font-weight:700;">${p.toFixed(1)}%</td>
+                    <td>${badge}</td>
+                    <td style="text-align:center;font-size:18px;">${trend}</td>
+                </tr>`;
+        });
+    }
+
+    function renderTrimestre() {
+        const data = DB.positivacao;
+        const q4 = data.filter(r => ['2025-10','2025-11','2025-12'].includes(r.PERIODO));
+        const q1 = data.filter(r => ['2026-01','2026-02','2026-03'].includes(r.PERIODO));
+        const v4 = q4.reduce((a,b) => a+b.POSITIVADO, 0);
+        const v1 = q1.reduce((a,b) => a+b.POSITIVADO, 0);
+        const cresc = v4 > 0 ? (((v1/v4)-1)*100).toFixed(1) : 0;
+
+        const triCtx = document.getElementById('triChart').getContext('2d');
+        if(myCharts.tri) myCharts.tri.destroy();
+        myCharts.tri = new Chart(triCtx, {
+            type: 'bar',
+            data: {
+                labels: ['4º TRI 2025', '1º TRI 2026'],
+                datasets: [{
+                    label: 'Positivação Total',
+                    data: [v4, v1],
+                    backgroundColor: ['rgba(255,255,255,0.12)', '#00d4ff'],
+                    borderRadius: 14,
+                }]
+            },
+            options: { plugins:{legend:{display:false}}, scales:{ y:{display:false}, x:{grid:{display:false},ticks:{color:'#aaa'}} } }
+        });
+
+        document.getElementById('triValue').innerText = (cresc > 0 ? '+' : '') + cresc + '%';
+
+        // Gráfico mensal
+        const meses = [...new Set(data.map(r => r.PERIODO))].sort();
+        const monthlyTotals = meses.map(m => data.filter(r=>r.PERIODO===m).reduce((a,b)=>a+b.POSITIVADO,0));
+        const mCtx = document.getElementById('monthlyChart').getContext('2d');
+        if(myCharts.monthly) myCharts.monthly.destroy();
+        myCharts.monthly = new Chart(mCtx, {
+            type: 'line',
+            data: {
+                labels: meses.map(fmtPeriodo),
+                datasets: [{
+                    label: 'Positivação',
+                    data: monthlyTotals,
+                    borderColor: '#00d4ff',
+                    backgroundColor: 'rgba(0,212,255,0.08)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00d4ff',
+                    pointRadius: 4,
+                }]
+            },
+            options: { plugins:{legend:{display:false}}, scales:{ y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}}, x:{grid:{display:false},ticks:{color:'#aaa',maxRotation:45}} } }
+        });
+
+        // Pie por coordenador (último mês)
+        const ultMes = meses[meses.length - 1];
+        const lastData = data.filter(r => r.PERIODO === ultMes);
+        const pCtx = document.getElementById('coordPieChart').getContext('2d');
+        if(myCharts.pie) myCharts.pie.destroy();
+        myCharts.pie = new Chart(pCtx, {
+            type: 'doughnut',
+            data: {
+                labels: lastData.map(r => r.COORDENADOR.split(' ')[0]),
+                datasets: [{ data: lastData.map(r => r.POSITIVADO), backgroundColor: ['#00d4ff','#0082ff','#10b981','#f59e0b','#8b5cf6'], borderWidth: 2, borderColor: 'transparent' }]
+            },
+            options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#aaa', boxWidth:12 } } }, cutout:'65%' }
+        });
+    }
+
+    function renderStatus() {
+        // KPIs de status (somar Mar/26 = último mês)
+        const mar = DB.status.filter(r => r.MES === 'Mar/26');
+        const stOk   = mar.reduce((a,b) => a+b.REGULAR, 0);
+        const stWarn = mar.reduce((a,b) => a+b.ACOMP, 0);
+        const stRisk = mar.reduce((a,b) => a+b.RISCO, 0);
+        document.getElementById('st-ok').innerText   = stOk.toLocaleString('pt-BR');
+        document.getElementById('st-warn').innerText = stWarn.toLocaleString('pt-BR');
+        document.getElementById('st-risk').innerText = stRisk.toLocaleString('pt-BR');
+
+        // Tabela por coordenador
+        const tbody = document.getElementById('statusTbody');
+        tbody.innerHTML = '';
+        mar.forEach(r => {
+            const total = r.REGULAR + r.ACOMP + r.RISCO + r.NOVOS;
+            const cob = total > 0 ? ((r.REGULAR / total)*100).toFixed(0) : 0;
+            const trend = r.REGULAR >= 150 ? '<i class="fa-solid fa-caret-up" style="color:#10b981"></i>' :
+                          r.REGULAR >= 110 ? '<i class="fa-solid fa-minus" style="color:#f59e0b"></i>' :
+                          '<i class="fa-solid fa-caret-down" style="color:#ef4444"></i>';
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${r.COORDENADOR}</strong></td>
+                    <td style="color:#10b981;font-weight:600">${r.REGULAR}</td>
+                    <td style="color:#f59e0b;font-weight:600">${r.ACOMP}</td>
+                    <td style="color:#ef4444;font-weight:600">${r.RISCO}</td>
+                    <td style="color:#3b82f6;font-weight:600">${r.NOVOS}</td>
+                    <td>
+                        <div style="font-weight:700;font-size:14px;">${cob}%</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width:${cob}%"></div></div>
+                    </td>
+                    <td style="text-align:center;font-size:18px;">${trend}</td>
+                </tr>`;
+        });
+
+        // Donut de status
+        const sCtx = document.getElementById('statusDonut').getContext('2d');
+        if(myCharts.statusDonut) myCharts.statusDonut.destroy();
+        myCharts.statusDonut = new Chart(sCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Regular', 'Acompanhamento', 'Em Risco', 'Novos'],
+                datasets: [{ data: [stOk, stWarn, stRisk, mar.reduce((a,b)=>a+b.NOVOS,0)],
+                    backgroundColor: ['#10b981','#f59e0b','#ef4444','#3b82f6'],
+                    borderWidth: 2, borderColor: 'transparent' }]
+            },
+            options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#aaa', boxWidth:12 } } }, cutout:'60%' }
+        });
+
+        // Line evolução mensal
+        const meses = ['Jan/26', 'Fev/26', 'Mar/26'];
+        const lCtx = document.getElementById('statusLine').getContext('2d');
+        if(myCharts.statusLine) myCharts.statusLine.destroy();
+        myCharts.statusLine = new Chart(lCtx, {
+            type: 'line',
+            data: {
+                labels: meses,
+                datasets: [
+                    { label:'Regular', data: meses.map(m => DB.status.filter(r=>r.MES===m).reduce((a,b)=>a+b.REGULAR,0)), borderColor:'#10b981', tension:0.4, fill:false, pointRadius:5 },
+                    { label:'Acompanhamento', data: meses.map(m => DB.status.filter(r=>r.MES===m).reduce((a,b)=>a+b.ACOMP,0)), borderColor:'#f59e0b', tension:0.4, fill:false, pointRadius:5 },
+                    { label:'Em Risco', data: meses.map(m => DB.status.filter(r=>r.MES===m).reduce((a,b)=>a+b.RISCO,0)), borderColor:'#ef4444', tension:0.4, fill:false, pointRadius:5 },
+                ]
+            },
+            options: { plugins:{ legend:{ labels:{ color:'#aaa', boxWidth:12 } } }, scales:{ y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#aaa' } }, x:{ grid:{display:false}, ticks:{color:'#aaa'} } } }
+        });
+    }
+
+    function renderSWOT() {
+        const li = (text) => `<li>${text}</li>`;
+        document.getElementById('list-f').innerHTML = DB.swot.forcas.map(li).join('');
+        document.getElementById('list-w').innerHTML = DB.swot.fraquezas.map(li).join('');
+        document.getElementById('list-o').innerHTML = DB.swot.oportunidades.map(li).join('');
+        document.getElementById('list-t').innerHTML = DB.swot.ameacas.map(li).join('');
+    }
+
+    function renderIBGE() {
+        const d = DB.ibge;
+        document.getElementById('reg-total').innerText = d.length;
+        const top = d.reduce((a,b) => b.CART_TOTAL > a.CART_TOTAL ? b : a);
+        document.getElementById('reg-top').innerText = top.MESORREGIAO;
+        const best = d.reduce((a,b) => (b.POSITIVADO/b.CART_TOTAL) > (a.POSITIVADO/a.CART_TOTAL) ? b : a);
+        document.getElementById('reg-best').innerText = best.MESORREGIAO;
+        const avgPerc = (d.reduce((a,b) => a + b.POSITIVADO/b.CART_TOTAL, 0) / d.length * 100).toFixed(1);
+        document.getElementById('reg-avg').innerText = avgPerc + '%';
+
+        // Bar chart
+        const iCtx = document.getElementById('ibgeChart').getContext('2d');
+        if(myCharts.ibge) myCharts.ibge.destroy();
+        myCharts.ibge = new Chart(iCtx, {
+            type: 'bar',
+            data: {
+                labels: d.map(r => r.MESORREGIAO),
+                datasets: [
+                    { label:'Carteira Total', data: d.map(r => r.CART_TOTAL), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius:8 },
+                    { label:'Positivado', data: d.map(r => r.POSITIVADO), backgroundColor: '#00d4ff', borderRadius:8 },
+                ]
+            },
+            options: {
+                plugins:{ legend:{ labels:{ color:'#aaa', boxWidth:12 } } },
+                scales:{
+                    y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#aaa' } },
+                    x:{ grid:{display:false}, ticks:{ color:'#aaa', maxRotation:35, font:{size:11} } }
+                }
+            }
+        });
+
+        // List cards
+        const listEl = document.getElementById('ibgeList');
+        listEl.innerHTML = '';
+        d.forEach(r => {
+            const perc = (r.POSITIVADO / r.CART_TOTAL * 100).toFixed(1);
+            const col = perc >= 80 ? '#10b981' : perc >= 65 ? '#f59e0b' : '#ef4444';
+            listEl.innerHTML += `
+                <div class="region-card">
+                    <div>
+                        <div class="region-name">${r.MESORREGIAO}</div>
+                        <div class="region-meta">${r.UF} · ${r.REGIAO} · ${r.COORD}</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-weight:700;font-size:18px;color:${col}">${perc}%</div>
+                        <div style="font-size:12px;opacity:0.55;">${r.POSITIVADO} / ${r.CART_TOTAL} clientes</div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    // Inicializar ao carregar
+    initDashboard();
+    </script>
+
+    <!-- ================================================================
+    ESTRUTURA DA BASE DE DADOS — DOCUMENTAÇÃO INLINE
+    ================================================================
+
+    TABELA 1: DB.positivacao (75 registros)
+    ----------------------------------------
+    Colunas:
+      COORDENADOR   → Nome do coordenador de campo
+      PERIODO       → Ano-mês no formato YYYY-MM (Jan/25 a Mar/26)
+      CART_TOTAL    → Total de clientes na carteira do coordenador
+      CART_ATIVA    → Clientes elegíveis para visita no período
+      POSITIVADO    → Clientes efetivamente atendidos/ativados
+      REGIAO        → Macrorregião IBGE (Sudeste, Sul, Nordeste, etc.)
+
+    5 coordenadores × 15 meses = 75 linhas.
+    Relacionamento: chave COORDENADOR liga às tabelas STATUS e IBGE.
+
+    TABELA 2: DB.swot (4 arrays)
+    ----------------------------------------
+    Arrays: forcas[], fraquezas[], oportunidades[], ameacas[]
+    Cada item é uma string descritiva. Sem chave de relacionamento —
+    dados fixos de análise estratégica.
+
+    TABELA 3: DB.status (15 registros)
+    ----------------------------------------
+    Colunas:
+      COORDENADOR   → FK para DB.positivacao
+      MES           → Mês no formato Mmm/AA (Jan/26, Fev/26, Mar/26)
+      REGULAR       → Clientes em atendimento regular
+      ACOMP         → Clientes em acompanhamento especial
+      RISCO         → Clientes em risco de inativação
+      NOVOS         → Novos clientes incorporados no mês
+
+    5 coordenadores × 3 meses = 15 linhas.
+
+    TABELA 4: DB.ibge (11 registros)
+    ----------------------------------------
+    Colunas:
+      MESORREGIAO   → Nome da mesorregião IBGE
+      UF            → Estado (sigla)
+      REGIAO        → Macrorregião
+      CART_TOTAL    → Clientes totais na mesorregião
+      POSITIVADO    → Clientes atendidos
+      COORD         → FK coordenador responsável
+
+    RELACIONAMENTOS:
+      positivacao.COORDENADOR ↔ status.COORDENADOR  (1:N)
+      positivacao.COORDENADOR ↔ ibge.COORD          (1:N)
+      positivacao.REGIAO      ↔ ibge.REGIAO         (N:N, denormalizado)
+
+    Para editar os dados: localize o objeto DB no <script> e altere
+    os valores diretamente. Cada tabela é um array de objetos JS.
+    ================================================================ -->
+
+</body>
+</html>
